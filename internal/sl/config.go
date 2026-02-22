@@ -25,6 +25,10 @@ func loadConfig() (appConfig, error) {
 	return cfg, nil
 }
 
+func SaveRoute(from, to string) error {
+	return saveConfig(appConfig{From: from, To: to})
+}
+
 func saveConfig(cfg appConfig) error {
 	path, err := configPath()
 	if err != nil {

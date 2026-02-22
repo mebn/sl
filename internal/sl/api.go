@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func lookupStop(client *http.Client, search string) (location, error) {
+func LookupStop(client *http.Client, search string) (location, error) {
 	var payload stopFinderResponse
 	err := getJSON(client, stopFinderURL, map[string]string{
 		"name_sf":           search,
@@ -47,7 +47,7 @@ func pickBestLocation(locations []location) (location, bool) {
 	return locations[best], true
 }
 
-func fetchTrips(client *http.Client, fromID, toID string, limit int) ([]journey, error) {
+func FetchTrips(client *http.Client, fromID, toID string, limit int) ([]journey, error) {
 	if limit <= 0 {
 		limit = 1
 	}

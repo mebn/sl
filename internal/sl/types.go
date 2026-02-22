@@ -60,9 +60,10 @@ type appConfig struct {
 	To   string `json:"to"`
 }
 
-type cliOptions struct {
+type CLIOptions struct {
 	SavePair    bool
 	Reverse     bool
 	ShowHelp    bool
+	Upgrade     bool
 	Positionals []string
 }

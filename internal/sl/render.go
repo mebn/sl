@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-func printJourneys(out io.Writer, fromLoc, toLoc location, journeys []journey) {
+func PrintJourneys(out io.Writer, fromLoc, toLoc location, journeys []journey) {
 	color := supportsColor()
 	fmt.Fprintf(out, "%s\n", colorize(routeNameFallback(fromLoc.Name)+" -> "+routeNameFallback(toLoc.Name), ansiBold+ansiCyan, color))
 
 	for i, j := range journeys {
-		if i >= resultsToShow {
+		if i >= ResultsToShow {
 			break
 		}
 		if i > 0 {

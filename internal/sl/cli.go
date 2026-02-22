@@ -20,23 +20,26 @@ Usage:
   sl <from> <to> -s
   sl
   sl -r
+  sl -u | --upgrade
   sl -h | --help
 
 Flags:
   -s  Save the provided route as your default (for plain ` + "`sl`" + `)
   -r  Reverse from/to (works with saved route or provided args)
+  -u, --upgrade  Upgrade CLI via ` + "`go install github.com/mebn/sl@latest`" + `
   -h, --help  Show this help
 
 Examples:
   sl Odenplan Slussen
   sl -s "Langsjo torg" "Sveavagen 20, Stockholm"
   sl -r
+  sl --upgrade
 
 Note: flags can be placed before or after route arguments.
 `
 
-func parseCLIArgs(args []string) (cliOptions, error) {
-	var opts cliOptions
+func ParseCLIArgs(args []string) (CLIOptions, error) {
+	var opts CLIOptions
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -45,8 +48,10 @@ func parseCLIArgs(args []string) (cliOptions, error) {
 			return opts, nil
 		case a == "--help":
 			opts.ShowHelp = true
+		case a == "--upgrade":
+			opts.Upgrade = true
 		case strings.HasPrefix(a, "--"):
-			return cliOptions{}, fmt.Errorf("unknown flag: %s", a)
+			return CLIOptions{}, fmt.Errorf("unknown flag: %s", a)
 		case strings.HasPrefix(a, "-") && a != "-":
 			for _, r := range a[1:] {
 				switch r {
@@ -56,8 +61,10 @@ func parseCLIArgs(args []string) (cliOptions, error) {
 					opts.Reverse = true
 				case 'h':
 					opts.ShowHelp = true
+				case 'u':
+					opts.Upgrade = true
 				default:
-					return cliOptions{}, fmt.Errorf("unknown flag: -%c", r)
+					return CLIOptions{}, fmt.Errorf("unknown flag: -%c", r)
 				}
 			}
 		default:
@@ -67,9 +74,9 @@ func parseCLIArgs(args []string) (cliOptions, error) {
 	return opts, nil
 }
 
-func printUsage(out io.Writer) { _, _ = io.WriteString(out, usageText) }
+func PrintUsage(out io.Writer) { _, _ = io.WriteString(out, usageText) }
 
-func resolveFromTo(args []string, reverse bool) (string, string, error) {
+func ResolveFromTo(args []string, reverse bool) (string, string, error) {
 	var from, to string
 	switch len(args) {
 	case 0:
