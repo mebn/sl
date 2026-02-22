@@ -1,9 +1,9 @@
 # SL
 
-Small CLI for quickly fetching upcoming SL public transit trips between two places.
+CLI for quickly fetching upcoming SL public transit trips between two places.
 
 <p align="center">
-  <img src="https://github.com/mebn/sl/blob/main/images/preview.png" width="150">
+  <img src="images/preview.png" width="80%">
 </p>
 
 ## Install
