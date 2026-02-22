@@ -69,7 +69,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func runUpgrade(stdout, stderr io.Writer) int {
-	cmd := exec.Command("go", "install", "github.com/mebn/sl@latest")
+	cmd := exec.Command("go", "install", "github.com/mebn/sl")
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
