@@ -8,9 +8,7 @@ import (
 	"strings"
 )
 
-const usageText = `SL - public transit trips between two places
-
-Fetches upcoming SL journey alternatives.
+const usageText = `Fetches upcoming SL journey alternatives.
 When a route is saved, you can run ` + "`sl`" + ` without arguments.
 Flags can be placed before or after route arguments.
 
@@ -26,7 +24,7 @@ Usage:
 Flags:
   -s  Save the provided route as your default (for plain ` + "`sl`" + `)
   -r  Reverse from/to (works with saved route or provided args)
-  -u, --upgrade  Upgrade CLI via ` + "`go install github.com/mebn/sl@latest`" + `
+  -u, --upgrade  Upgrades the CLI tool
   -h, --help  Show this help
 `
 
