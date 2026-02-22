@@ -10,7 +10,7 @@ import (
 
 func PrintJourneys(out io.Writer, fromLoc, toLoc location, journeys []journey) {
 	color := supportsColor()
-	fmt.Fprintf(out, "%s\n", colorize(routeNameFallback(fromLoc.Name)+" -> "+routeNameFallback(toLoc.Name), ansiBold+ansiCyan, color))
+	fmt.Fprintf(out, "%s\n\n", colorize(routeNameFallback(fromLoc.Name)+" -> "+routeNameFallback(toLoc.Name), ansiBold+ansiCyan, color))
 
 	for i, j := range journeys {
 		if i >= ResultsToShow {
