@@ -1,8 +1,6 @@
 # SL
 
-Small Go CLI for quickly fetching upcoming SL public transit trips between two places.
-
-The output favors realistic routes and filters out tiny metro-hop detours when a direct walk alternative exists.
+Small CLI for quickly fetching upcoming SL public transit trips between two places.
 
 ## Install
 
