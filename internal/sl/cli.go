@@ -10,9 +10,9 @@ import (
 
 const usageText = `SL - public transit trips between two places
 
-Fetches upcoming SL journey alternatives and prints legs with times.
-It filters out tiny metro-hop detours when a direct walk alternative exists.
+Fetches upcoming SL journey alternatives.
 When a route is saved, you can run ` + "`sl`" + ` without arguments.
+Flags can be placed before or after route arguments.
 
 Usage:
   sl <from> <to>
@@ -28,14 +28,6 @@ Flags:
   -r  Reverse from/to (works with saved route or provided args)
   -u, --upgrade  Upgrade CLI via ` + "`go install github.com/mebn/sl@latest`" + `
   -h, --help  Show this help
-
-Examples:
-  sl Odenplan Slussen
-  sl -s "Langsjo torg" "Sveavagen 20, Stockholm"
-  sl -r
-  sl --upgrade
-
-Note: flags can be placed before or after route arguments.
 `
 
 func ParseCLIArgs(args []string) (CLIOptions, error) {
