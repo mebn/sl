@@ -1,7 +1,5 @@
 package sl
 
-import "time"
-
 type stopFinderResponse struct {
 	Locations []location      `json:"locations"`
 	Messages  []systemMessage `json:"systemMessages"`
@@ -67,13 +65,4 @@ type cliOptions struct {
 	Reverse     bool
 	ShowHelp    bool
 	Positionals []string
-}
-
-type tinyHopSegment struct {
-	From   string
-	To     string
-	Dep    time.Time
-	Arr    time.Time
-	HasDep bool
-	HasArr bool
 }

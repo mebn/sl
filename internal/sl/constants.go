@@ -4,7 +4,6 @@ const (
 	stopFinderURL = "https://journeyplanner.integration.sl.se/v2/stop-finder"
 	tripsURL      = "https://journeyplanner.integration.sl.se/v2/trips"
 	resultsToShow = 5
-	strictMode    = true
 
 	ansiReset   = "\033[0m"
 	ansiBold    = "\033[1m"

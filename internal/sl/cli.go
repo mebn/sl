@@ -8,26 +8,48 @@ import (
 	"strings"
 )
 
+const usageText = `SL - public transit trips between two places
+
+Fetches upcoming SL journey alternatives and prints legs with times.
+It filters out tiny metro-hop detours when a direct walk alternative exists.
+When a route is saved, you can run ` + "`sl`" + ` without arguments.
+
+Usage:
+  sl <from> <to>
+  sl -s <from> <to>
+  sl <from> <to> -s
+  sl
+  sl -r
+  sl -h | --help
+
+Flags:
+  -s  Save the provided route as your default (for plain ` + "`sl`" + `)
+  -r  Reverse from/to (works with saved route or provided args)
+  -h, --help  Show this help
+
+Examples:
+  sl Odenplan Slussen
+  sl -s "Langsjo torg" "Sveavagen 20, Stockholm"
+  sl -r
+
+Note: flags can be placed before or after route arguments.
+`
+
 func parseCLIArgs(args []string) (cliOptions, error) {
 	var opts cliOptions
-
 	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "--" {
+		a := args[i]
+		switch {
+		case a == "--":
 			opts.Positionals = append(opts.Positionals, args[i+1:]...)
-			break
-		}
-		if arg == "--help" {
+			return opts, nil
+		case a == "--help":
 			opts.ShowHelp = true
-			continue
-		}
-
-		if strings.HasPrefix(arg, "-") && arg != "-" {
-			if strings.HasPrefix(arg, "--") {
-				return cliOptions{}, fmt.Errorf("unknown flag: %s", arg)
-			}
-			for _, flagChar := range arg[1:] {
-				switch flagChar {
+		case strings.HasPrefix(a, "--"):
+			return cliOptions{}, fmt.Errorf("unknown flag: %s", a)
+		case strings.HasPrefix(a, "-") && a != "-":
+			for _, r := range a[1:] {
+				switch r {
 				case 's':
 					opts.SavePair = true
 				case 'r':
@@ -35,44 +57,20 @@ func parseCLIArgs(args []string) (cliOptions, error) {
 				case 'h':
 					opts.ShowHelp = true
 				default:
-					return cliOptions{}, fmt.Errorf("unknown flag: -%c", flagChar)
+					return cliOptions{}, fmt.Errorf("unknown flag: -%c", r)
 				}
 			}
-			continue
+		default:
+			opts.Positionals = append(opts.Positionals, a)
 		}
-
-		opts.Positionals = append(opts.Positionals, arg)
 	}
-
 	return opts, nil
 }
 
-func printUsage(out io.Writer) {
-	fmt.Fprintf(out, "SL - public transit trips between two places\n\n")
-	fmt.Fprintf(out, "Fetches upcoming SL journey alternatives and prints legs with times.\n")
-	fmt.Fprintf(out, "It filters out tiny metro-hop detours when a direct walk alternative exists.\n")
-	fmt.Fprintf(out, "When a route is saved, you can run `sl` without arguments.\n\n")
-	fmt.Fprintf(out, "Usage:\n")
-	fmt.Fprintf(out, "  sl <from> <to>\n")
-	fmt.Fprintf(out, "  sl -s <from> <to>\n")
-	fmt.Fprintf(out, "  sl <from> <to> -s\n")
-	fmt.Fprintf(out, "  sl\n")
-	fmt.Fprintf(out, "  sl -r\n")
-	fmt.Fprintf(out, "  sl -h | --help\n\n")
-	fmt.Fprintf(out, "Flags:\n")
-	fmt.Fprintf(out, "  -s  Save the provided route as your default (for plain `sl`)\n")
-	fmt.Fprintf(out, "  -r  Reverse from/to (works with saved route or provided args)\n")
-	fmt.Fprintf(out, "  -h, --help  Show this help\n\n")
-	fmt.Fprintf(out, "Examples:\n")
-	fmt.Fprintf(out, "  sl Odenplan Slussen\n")
-	fmt.Fprintf(out, "  sl -s \"Langsjo torg\" \"Sveavagen 20, Stockholm\"\n")
-	fmt.Fprintf(out, "  sl -r\n\n")
-	fmt.Fprintf(out, "Note: flags can be placed before or after route arguments.\n")
-}
+func printUsage(out io.Writer) { _, _ = io.WriteString(out, usageText) }
 
 func resolveFromTo(args []string, reverse bool) (string, string, error) {
 	var from, to string
-
 	switch len(args) {
 	case 0:
 		cfg, err := loadConfig()
@@ -91,10 +89,8 @@ func resolveFromTo(args []string, reverse bool) (string, string, error) {
 	default:
 		return "", "", errors.New("expected either no arguments or exactly two: <from> <to>")
 	}
-
 	if reverse {
 		from, to = to, from
 	}
-
 	return from, to, nil
 }

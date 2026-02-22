@@ -9,12 +9,8 @@ import (
 )
 
 func printJourneys(out io.Writer, fromLoc, toLoc location, journeys []journey) {
-	useColor := supportsColor()
-	displayFrom := routeNameFallback(fromLoc.Name)
-	displayTo := routeNameFallback(toLoc.Name)
-
-	routeHeader := fmt.Sprintf("%s -> %s", displayFrom, displayTo)
-	fmt.Fprintf(out, "%s\n", colorize(routeHeader, ansiBold+ansiCyan, useColor))
+	color := supportsColor()
+	fmt.Fprintf(out, "%s\n", colorize(routeNameFallback(fromLoc.Name)+" -> "+routeNameFallback(toLoc.Name), ansiBold+ansiCyan, color))
 
 	for i, j := range journeys {
 		if i >= resultsToShow {
@@ -26,76 +22,63 @@ func printJourneys(out io.Writer, fromLoc, toLoc location, journeys []journey) {
 
 		dep, depOK := departureTime(j)
 		arr, arrOK := arrivalTime(j)
-		dur := journeyDuration(j)
+		changesWord := "changes"
+		if j.Interchanges == 1 {
+			changesWord = "change"
+		}
+		fmt.Fprintf(out, "%s %s\n",
+			colorize(fmt.Sprintf("%d. %s -> %s", i+1, formatTime(dep, depOK), formatTime(arr, arrOK)), ansiBlue, color),
+			colorize(fmt.Sprintf("(%s, %d %s)", formatDuration(journeyDuration(j)), j.Interchanges, changesWord), ansiDim, color),
+		)
 
-		altLine := fmt.Sprintf("%d. %s -> %s", i+1, formatTime(dep, depOK), formatTime(arr, arrOK))
-		detailLine := fmt.Sprintf("(%s, %d %s)", formatDuration(dur), j.Interchanges, pluralize("change", j.Interchanges))
-		fmt.Fprintf(out, "%s %s\n", colorize(altLine, ansiBlue, useColor), colorize(detailLine, ansiDim, useColor))
+		legs := compactWalkLegs(j.Legs)
+		var prevEnd time.Time
+		havePrevEnd := false
+		for idx, l := range legs {
+			depText, arrText, legEnd, haveLegEnd := legTimeWindow(l, prevEnd, havePrevEnd)
 
-		displayLegs := compactLegsForDisplay(j.Legs)
-		var prevLegArrival time.Time
-		havePrevLegArrival := false
-		for legIdx, leg := range displayLegs {
-			legDep, legDepOK := legDepartureTime(leg)
-			legArr, legArrOK := legArrivalTime(leg)
-			legDep, legDepOK, legArr, legArrOK = normalizeLegTimes(legDep, legDepOK, legArr, legArrOK, prevLegArrival, havePrevLegArrival)
-
-			originName := lineStopName(leg.Origin.Name)
-			destinationName := lineStopName(leg.Destination.Name)
-			if legIdx == 0 && isAddressLike(fromLoc.Type) {
-				originName = routeNameFallback(fromLoc.Name)
+			from := lineStopName(l.Origin.Name)
+			to := lineStopName(l.Destination.Name)
+			if idx == 0 && isAddressType(fromLoc.Type) {
+				from = routeNameFallback(fromLoc.Name)
 			}
-			if legIdx == len(displayLegs)-1 && isAddressLike(toLoc.Type) {
-				destinationName = routeNameFallback(toLoc.Name)
+			if idx == len(legs)-1 && isAddressType(toLoc.Type) {
+				to = routeNameFallback(toLoc.Name)
 			}
-			if isWalkingLeg(leg) && strings.EqualFold(originName, destinationName) {
-				if legArrOK {
-					prevLegArrival = legArr
-					havePrevLegArrival = true
-				} else if legDepOK {
-					prevLegArrival = legDep
-					havePrevLegArrival = true
+			if isWalkingLeg(l) && strings.EqualFold(from, to) {
+				if haveLegEnd {
+					prevEnd, havePrevEnd = legEnd, true
 				}
 				continue
 			}
 
-			legTimes := formatLegTimeRange(legDep, legDepOK, legArr, legArrOK)
-			fmt.Fprintf(out, "   %s %s %s -> %s\n", colorize(legTimes, ansiGreen, useColor), colorize(legLabel(leg), modeColor(leg), useColor), originName, destinationName)
-
-			if legArrOK {
-				prevLegArrival = legArr
-				havePrevLegArrival = true
-			} else if legDepOK {
-				prevLegArrival = legDep
-				havePrevLegArrival = true
+			fmt.Fprintf(out, "   %s %s %s -> %s\n",
+				colorize(depText+" -> "+arrText, ansiGreen, color),
+				colorize(legLabel(l), modeColor(l), color),
+				from,
+				to,
+			)
+			if haveLegEnd {
+				prevEnd, havePrevEnd = legEnd, true
 			}
 		}
 	}
 }
 
-func compactLegsForDisplay(legs []leg) []leg {
+func compactWalkLegs(legs []leg) []leg {
 	if len(legs) < 2 {
 		return legs
 	}
-
 	out := make([]leg, 0, len(legs))
-	for _, current := range legs {
-		if len(out) == 0 {
-			out = append(out, current)
+	for _, l := range legs {
+		if len(out) > 0 && isWalkingLeg(out[len(out)-1]) && isWalkingLeg(l) {
+			merged := out[len(out)-1]
+			merged.Destination = l.Destination
+			out[len(out)-1] = merged
 			continue
 		}
-
-		lastIdx := len(out) - 1
-		if isWalkingLeg(out[lastIdx]) && isWalkingLeg(current) {
-			merged := out[lastIdx]
-			merged.Destination = current.Destination
-			out[lastIdx] = merged
-			continue
-		}
-
-		out = append(out, current)
+		out = append(out, l)
 	}
-
 	return out
 }
 
@@ -103,16 +86,15 @@ func departureTime(j journey) (time.Time, bool) {
 	if len(j.Legs) == 0 {
 		return time.Time{}, false
 	}
-	origin := j.Legs[0].Origin
-	return parseTripTime(origin.DepartureTimeEstimated, origin.DepartureTimePlanned, origin.ArrivalTimeEstimated, origin.ArrivalTimePlanned)
+	return parseTripTime(j.Legs[0].Origin.DepartureTimeEstimated, j.Legs[0].Origin.DepartureTimePlanned, j.Legs[0].Origin.ArrivalTimeEstimated, j.Legs[0].Origin.ArrivalTimePlanned)
 }
 
 func arrivalTime(j journey) (time.Time, bool) {
 	if len(j.Legs) == 0 {
 		return time.Time{}, false
 	}
-	destination := j.Legs[len(j.Legs)-1].Destination
-	return parseTripTime(destination.ArrivalTimeEstimated, destination.ArrivalTimePlanned, destination.DepartureTimeEstimated, destination.DepartureTimePlanned)
+	last := j.Legs[len(j.Legs)-1].Destination
+	return parseTripTime(last.ArrivalTimeEstimated, last.ArrivalTimePlanned, last.DepartureTimeEstimated, last.DepartureTimePlanned)
 }
 
 func legDepartureTime(l leg) (time.Time, bool) {
@@ -123,74 +105,120 @@ func legArrivalTime(l leg) (time.Time, bool) {
 	return parseTripTime(l.Destination.ArrivalTimeEstimated, l.Destination.ArrivalTimePlanned, l.Destination.DepartureTimeEstimated, l.Destination.DepartureTimePlanned)
 }
 
-func parseTripTime(values ...string) (time.Time, bool) {
-	for _, value := range values {
-		if value == "" {
-			continue
-		}
-		t, err := time.Parse(time.RFC3339, value)
-		if err != nil {
-			continue
-		}
-		return t.In(time.Local), true
+func legTimeWindow(l leg, prevEnd time.Time, havePrev bool) (string, string, time.Time, bool) {
+	dep, depOK := legDepartureTime(l)
+	arr, arrOK := legArrivalTime(l)
+
+	if !depOK && havePrev {
+		dep, depOK = prevEnd, true
+	}
+	if depOK && havePrev && dep.Before(prevEnd) {
+		dep = prevEnd
+	}
+	if !arrOK && depOK {
+		arr, arrOK = dep, true
+	}
+	if depOK && arrOK && arr.Before(dep) {
+		arr = dep
+	}
+	if depOK && arrOK && arr.After(dep) && dep.Format("15:04") == arr.Format("15:04") {
+		arr = arr.Truncate(time.Minute).Add(time.Minute)
 	}
 
+	end, endOK := arr, arrOK
+	if !endOK {
+		end, endOK = dep, depOK
+	}
+	return formatTime(dep, depOK), formatTime(arr, arrOK), end, endOK
+}
+
+func parseTripTime(values ...string) (time.Time, bool) {
+	for _, v := range values {
+		if v == "" {
+			continue
+		}
+		t, err := time.Parse(time.RFC3339, v)
+		if err == nil {
+			return t.In(time.Local), true
+		}
+	}
 	return time.Time{}, false
 }
 
 func journeyDuration(j journey) time.Duration {
-	seconds := j.TripRtDuration
-	if seconds <= 0 {
-		seconds = j.TripDuration
+	if j.TripRtDuration > 0 {
+		return time.Duration(j.TripRtDuration) * time.Second
 	}
-	if seconds <= 0 {
-		return 0
+	if j.TripDuration > 0 {
+		return time.Duration(j.TripDuration) * time.Second
 	}
-	return time.Duration(seconds) * time.Second
+	return 0
 }
 
-func formatDuration(duration time.Duration) string {
-	if duration <= 0 {
+func formatDuration(d time.Duration) string {
+	if d <= 0 {
 		return "unknown duration"
 	}
-
-	duration = duration.Round(time.Minute)
-	hours := duration / time.Hour
-	minutes := (duration % time.Hour) / time.Minute
-
-	if hours == 0 {
-		return fmt.Sprintf("%dm", minutes)
+	d = d.Round(time.Minute)
+	h, m := d/time.Hour, (d%time.Hour)/time.Minute
+	if h == 0 {
+		return fmt.Sprintf("%dm", m)
 	}
-
-	if minutes == 0 {
-		return fmt.Sprintf("%dh", hours)
+	if m == 0 {
+		return fmt.Sprintf("%dh", h)
 	}
-
-	return fmt.Sprintf("%dh%dm", hours, minutes)
+	return fmt.Sprintf("%dh%dm", h, m)
 }
 
-func legLabel(leg leg) string {
-	mode := strings.TrimSpace(leg.Transportation.Product.Name)
-	line := strings.TrimSpace(leg.Transportation.DisassembledName)
-
+func legLabel(l leg) string {
+	mode := strings.TrimSpace(l.Transportation.Product.Name)
+	line := strings.TrimSpace(l.Transportation.DisassembledName)
 	if line == "" {
-		line = strings.TrimSpace(leg.Transportation.Number)
+		line = strings.TrimSpace(l.Transportation.Number)
 	}
 	if line == "" {
-		line = strings.TrimSpace(leg.Transportation.Name)
-	}
-
-	if mode == "" && line == "" {
-		return "Unknown"
+		line = strings.TrimSpace(l.Transportation.Name)
 	}
 	if mode == "" {
+		if line == "" {
+			return "Unknown"
+		}
 		return line
 	}
 	if line == "" || strings.EqualFold(mode, line) {
 		return mode
 	}
-
 	return mode + " " + line
+}
+
+func isWalkingLeg(l leg) bool {
+	x := strings.ToLower(legLabel(l))
+	return strings.Contains(x, "footpath") || strings.Contains(x, "walk")
+}
+
+func isMetroLeg(l leg) bool {
+	x := strings.ToLower(legLabel(l))
+	return strings.HasPrefix(x, "metro") || strings.Contains(x, "tunnelbana")
+}
+
+func modeColor(l leg) string {
+	x := strings.ToLower(legLabel(l))
+	switch {
+	case strings.Contains(x, "footpath") || strings.Contains(x, "walk"):
+		return ansiRed
+	case strings.HasPrefix(x, "bus"):
+		return ansiYellow
+	case strings.HasPrefix(x, "metro") || strings.Contains(x, "tunnelbana"):
+		return ansiBlue
+	case strings.HasPrefix(x, "tram"):
+		return ansiMagenta
+	case strings.HasPrefix(x, "train") || strings.Contains(x, "commuter"):
+		return ansiCyan
+	case strings.HasPrefix(x, "ferry") || strings.HasPrefix(x, "ship"):
+		return ansiGreen
+	default:
+		return ansiYellow
+	}
 }
 
 func formatTime(t time.Time, ok bool) string {
@@ -200,131 +228,35 @@ func formatTime(t time.Time, ok bool) string {
 	return t.Format("15:04")
 }
 
-func formatLegTimeRange(dep time.Time, depOK bool, arr time.Time, arrOK bool) string {
-	if !depOK || !arrOK {
-		return fmt.Sprintf("%s -> %s", formatTime(dep, depOK), formatTime(arr, arrOK))
+func colorize(s, c string, on bool) string {
+	if !on || s == "" || c == "" {
+		return s
 	}
-
-	arrDisplay := arr
-	if arr.After(dep) && dep.Format("15:04") == arr.Format("15:04") {
-		arrDisplay = arr.Truncate(time.Minute).Add(time.Minute)
-	}
-
-	return fmt.Sprintf("%s -> %s", dep.Format("15:04"), arrDisplay.Format("15:04"))
-}
-
-func normalizeLegTimes(dep time.Time, depOK bool, arr time.Time, arrOK bool, prevArr time.Time, prevArrOK bool) (time.Time, bool, time.Time, bool) {
-	if !depOK && prevArrOK {
-		dep = prevArr
-		depOK = true
-	}
-
-	if depOK && prevArrOK && dep.Before(prevArr) {
-		dep = prevArr
-	}
-
-	if !arrOK && depOK {
-		arr = dep
-		arrOK = true
-	}
-
-	if arrOK && depOK && arr.Before(dep) {
-		arr = dep
-	}
-
-	return dep, depOK, arr, arrOK
-}
-
-func isWalkingLeg(l leg) bool {
-	lower := strings.ToLower(legLabel(l))
-	return strings.Contains(lower, "footpath") || strings.Contains(lower, "walk")
-}
-
-func isMetroLeg(l leg) bool {
-	lower := strings.ToLower(legLabel(l))
-	return strings.HasPrefix(lower, "metro") || strings.Contains(lower, "tunnelbana")
-}
-
-func modeColor(l leg) string {
-	lower := strings.ToLower(legLabel(l))
-
-	switch {
-	case strings.Contains(lower, "footpath") || strings.Contains(lower, "walk"):
-		return ansiRed
-	case strings.HasPrefix(lower, "bus"):
-		return ansiYellow
-	case strings.HasPrefix(lower, "metro") || strings.Contains(lower, "tunnelbana"):
-		return ansiBlue
-	case strings.HasPrefix(lower, "tram"):
-		return ansiMagenta
-	case strings.HasPrefix(lower, "train") || strings.Contains(lower, "commuter"):
-		return ansiCyan
-	case strings.HasPrefix(lower, "ferry") || strings.HasPrefix(lower, "ship"):
-		return ansiGreen
-	default:
-		return ansiYellow
-	}
-}
-
-func isAddressLike(locationType string) bool {
-	locationType = strings.ToLower(strings.TrimSpace(locationType))
-	return locationType == "singlehouse" || locationType == "address" || locationType == "street"
-}
-
-func colorize(text, colorCode string, enabled bool) string {
-	if !enabled || colorCode == "" || text == "" {
-		return text
-	}
-	return colorCode + text + ansiReset
+	return c + s + ansiReset
 }
 
 func supportsColor() bool {
-	if os.Getenv("NO_COLOR") != "" {
+	if os.Getenv("NO_COLOR") != "" || strings.EqualFold(os.Getenv("TERM"), "dumb") {
 		return false
 	}
-	if strings.EqualFold(os.Getenv("TERM"), "dumb") {
-		return false
-	}
-
-	stdoutInfo, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-
-	return (stdoutInfo.Mode() & os.ModeCharDevice) != 0
+	st, err := os.Stdout.Stat()
+	return err == nil && (st.Mode()&os.ModeCharDevice) != 0
 }
 
-func pluralize(word string, amount int) string {
-	if amount == 1 {
-		return word
-	}
-	return word + "s"
+func isAddressType(t string) bool {
+	t = strings.ToLower(strings.TrimSpace(t))
+	return t == "singlehouse" || t == "address" || t == "street"
 }
 
 func lineStopName(name string) string {
-	parts := commaParts(name)
-	if len(parts) == 0 {
-		return strings.TrimSpace(name)
+	head, _, ok := strings.Cut(name, ",")
+	if ok {
+		return strings.TrimSpace(head)
 	}
-	return parts[0]
+	return strings.TrimSpace(name)
 }
 
 func routeNameFallback(name string) string {
-	parts := commaParts(name)
-	if len(parts) == 0 {
-		return strings.TrimSpace(name)
-	}
-	return parts[len(parts)-1]
-}
-
-func commaParts(name string) []string {
-	rawParts := strings.Split(name, ",")
-	parts := make([]string, 0, len(rawParts))
-	for _, raw := range rawParts {
-		trimmed := strings.TrimSpace(raw)
-		if trimmed != "" {
-			parts = append(parts, trimmed)
-		}
-	}
-	return parts
+	parts := strings.Split(name, ",")
+	return strings.TrimSpace(parts[len(parts)-1])
 }
