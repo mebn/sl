@@ -9,7 +9,7 @@ CLI for quickly fetching upcoming SL public transit trips between two places.
 ## Install
 
 ```bash
-go install github.com/mebn/sl
+go install github.com/mebn/sl@latest
 ```
 
 Make sure your Go bin directory is in your `PATH`. Add `export PATH=$PATH:$HOME/go/bin` to your `.bashrc`/`.zshrc`.
